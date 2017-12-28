@@ -69,10 +69,11 @@ def encrypt(api_key, api_secret, export=True, export_fn='secrets.json'):
     return api
 
 
-def using_requests(request_url, apisign):
+def using_requests(request_url, apisign, proxies, verify):
     return requests.get(
         request_url,
-        headers={"apisign": apisign}
+        headers={"apisign": apisign},
+        proxies=proxies, verify=verify
     ).json()
 
 
@@ -81,13 +82,27 @@ class Bittrex(object):
     Used for requesting Bittrex with API key and API secret
     """
 
-    def __init__(self, api_key, api_secret, calls_per_second=1, dispatch=using_requests, api_version=API_V1_1):
+    def __init__(self, api_key, api_secret, calls_per_second=1, dispatch=using_requests, api_version=API_V1_1,
+                 proxies=None, verify=None):
         self.api_key = str(api_key) if api_key is not None else ''
         self.api_secret = str(api_secret) if api_secret is not None else ''
         self.dispatch = dispatch
         self.call_rate = 1.0 / calls_per_second
         self.last_call = None
         self.api_version = api_version
+
+        """
+        Try to take instance-wise proxies/verify argument or class-wise(static) variable otherwise
+        ex)
+          Bittrex.proxies = <proxies>
+        or
+          b = Bittrex(None, None, proxies=<proxies>)
+        or
+          b = Bittrex(None, None)
+          b.proxies = <proxies>
+        """
+        self.proxies = proxies if proxies is not None else Bittrex.proxies
+        self.verify = verify if verify is not None else Bittrex.verify
 
     def decrypt(self):
         if encrypted:
@@ -150,7 +165,7 @@ class Bittrex(object):
 
             self.wait()
 
-            return self.dispatch(request_url, apisign)
+            return self.dispatch(request_url, apisign, proxies=self.proxies, verify=self.verify)
 
         except Exception:
             return {
